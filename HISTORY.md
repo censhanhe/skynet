@@ -1,3 +1,12 @@
+Dev version
+-----------
+* add sharedata
+* bugfix: service exit before init would not report back
+* add skynet.response and check multicall skynet.ret
+* skynet.newservice throw error when lanuch faild
+* Don't check imported function in snax.hotfix
+* snax service add change SERVICE_PATH and add it to package.path
+
 v0.5.0 (2014-7-28)
 -----------
 * skynet.exit will quit service immediately.
