@@ -35,7 +35,7 @@ return function (name , G, loader)
 	local env = setmetatable({} , { __index = temp_global })
 	local func = {}
 
-	local system = { "init", "exit", "hotfix" }
+	local system = { "init", "exit", "hotfix", "profile"}
 
 	do
 		for k, v in ipairs(system) do
@@ -59,12 +59,10 @@ return function (name , G, loader)
 		end
 	end
 
-	setmetatable(G,	{ __index = env , __newindex = init_system })
-
 	local pattern
 
 	do
-		local path = skynet.getenv "snax"
+		local path = assert(skynet.getenv "snax" , "please set snax in config file")
 
 		local errlist = {}
 
@@ -85,9 +83,10 @@ return function (name , G, loader)
 		end
 	end
 
-	mainfunc()
-
+	setmetatable(G,	{ __index = env , __newindex = init_system })
+	local ok, err = pcall(mainfunc)
 	setmetatable(G, nil)
+	assert(ok,err)
 
 	for k,v in pairs(temp_global) do
 		G[k] = v
