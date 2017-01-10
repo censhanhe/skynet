@@ -3,6 +3,7 @@
 #include "skynet_imp.h"
 #include "skynet_env.h"
 #include "skynet_server.h"
+#include "luashrtbl.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,7 +26,6 @@ optint(const char *key, int opt) {
 	return strtol(str, NULL, 10);
 }
 
-/*
 static int
 optboolean(const char *key, int opt) {
 	const char * str = skynet_getenv(key);
@@ -35,7 +35,6 @@ optboolean(const char *key, int opt) {
 	}
 	return strcmp(str,"true")==0;
 }
-*/
 
 static const char *
 optstring(const char *key,const char * opt) {
@@ -87,9 +86,8 @@ static const char * load_config = "\
 	local config_name = ...\
 	local f = assert(io.open(config_name))\
 	local code = assert(f:read \'*a\')\
-	local function getenv(name) return assert(os.getenv(name), name) end\
+	local function getenv(name) return assert(os.getenv(name), \'os.getenv() failed: \' .. name) end\
 	code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\
-	print(code)\
 	f:close()\
 	local result = {}\
 	assert(load(code,\'=(load)\',\'t\',result))()\
@@ -98,10 +96,16 @@ static const char * load_config = "\
 
 int
 main(int argc, char *argv[]) {
-	const char * config_file = "config";
+	const char * config_file = NULL ;
 	if (argc > 1) {
 		config_file = argv[1];
+	} else {
+		fprintf(stderr, "Need a config file. Please read skynet wiki : https://github.com/cloudwu/skynet/wiki/Config\n"
+			"usage: skynet configfilename\n");
+		return 1;
 	}
+
+	luaS_initshr();
 	skynet_globalinit();
 	skynet_env_init();
 
@@ -109,19 +113,19 @@ main(int argc, char *argv[]) {
 
 	struct skynet_config config;
 
-	struct lua_State *L = lua_newstate(skynet_lalloc, NULL);
+	struct lua_State *L = luaL_newstate();
 	luaL_openlibs(L);	// link lua lib
 
 	int err = luaL_loadstring(L, load_config);
 	assert(err == LUA_OK);
 	lua_pushstring(L, config_file);
-	
+
 	err = lua_pcall(L, 1, 1, 0);
 	if (err) {
 		fprintf(stderr,"%s\n",lua_tostring(L,-1));
 		lua_close(L);
 		return 1;
-	} 
+	}
 	_init_env(L);
 
 	config.thread =  optint("thread",8);
@@ -130,11 +134,14 @@ main(int argc, char *argv[]) {
 	config.bootstrap = optstring("bootstrap","snlua bootstrap");
 	config.daemon = optstring("daemon", NULL);
 	config.logger = optstring("logger", NULL);
+	config.logservice = optstring("logservice", "logger");
+	config.profile = optboolean("profile", 1);
 
 	lua_close(L);
 
 	skynet_start(&config);
 	skynet_globalexit();
+	luaS_exitshr();
 
 	return 0;
 }
